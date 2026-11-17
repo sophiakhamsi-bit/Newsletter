@@ -1,0 +1,47 @@
+name: Weekly EDF Newsletter
+
+on:
+  schedule:
+    # Mondays at 06:00 UTC. GitHub Actions cron uses UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weekly-edf-newsletter
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip openai feedparser
+
+      - name: Generate newsletter
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+        run: python scripts/generate_newsletter.py
+
+      - name: Commit newsletter
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add newsletters/
+          if git diff --cached --quiet; then
+            echo "No newsletter changes to publish."
+          else
+            git commit -m "Publish EDF newsletter $(date -u +%F)"
+            git push
+          fi
